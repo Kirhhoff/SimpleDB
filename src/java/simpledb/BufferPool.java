@@ -2,7 +2,9 @@ package simpledb;
 
 import java.io.*;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -33,6 +35,9 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
+
+        buffer = new ArrayList<>(numPages);
+        bufferCapacity = numPages;
     }
     
     public static int getPageSize() {
@@ -67,7 +72,13 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+
+        Page page = searchPage(pid);
+
+        if (page != null)
+            return page;
+
+        return readInPage(pid);
     }
 
     /**
@@ -203,4 +214,62 @@ public class BufferPool {
         // not necessary for lab1
     }
 
+    private final List<Page> buffer;
+    private final int bufferCapacity;
+
+    private Page searchPage(PageId pid) {
+
+        for (Page page: buffer)
+            if (page.getId().equals(pid))
+                return page;
+
+        return null;
+    }
+
+    private Page readInPage(PageId pid) throws DbException {
+        if (bufferIsFull())
+            throw new DbException("Buffer pool has already been full");
+
+        Page page = readPageFromFile(pid);
+
+        addPageToBuffer(page);
+
+        return page;
+    }
+
+    private boolean bufferIsFull() {
+        return buffer.size() >= bufferCapacity;
+    }
+
+    private Page readPageFromFile(PageId pid) throws DbException {
+
+        DbFile file = getDbFileOfPage(pid);
+
+        Page page;
+        try {
+            page = file.readPage(pid);
+        } catch (IllegalArgumentException e) {
+            throw new DbException(String.format(
+                    "Page No: %d of file: %s not found", pid.getPageNumber(), file));
+        }
+
+        return page;
+    }
+
+    private DbFile getDbFileOfPage(PageId pid) throws DbException {
+
+        DbFile file;
+        try {
+            file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        } catch (NoSuchElementException e) {
+            throw new DbException(String.format(
+                    "DbFile for id: %d not found", pid.getTableId()));
+        }
+
+        return file;
+    }
+
+    private void addPageToBuffer(Page page) {
+        buffer.add(page);
+    }
 }

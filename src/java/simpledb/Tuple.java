@@ -1,8 +1,10 @@
 package simpledb;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -22,6 +24,9 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         // some code goes here
+
+        fields = new Field[td.numFields()];
+        this.td = td;
     }
 
     /**
@@ -29,7 +34,8 @@ public class Tuple implements Serializable {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+
+        return td;
     }
 
     /**
@@ -38,7 +44,8 @@ public class Tuple implements Serializable {
      */
     public RecordId getRecordId() {
         // some code goes here
-        return null;
+
+        return rid;
     }
 
     /**
@@ -49,6 +56,8 @@ public class Tuple implements Serializable {
      */
     public void setRecordId(RecordId rid) {
         // some code goes here
+
+        this.rid = rid;
     }
 
     /**
@@ -61,6 +70,9 @@ public class Tuple implements Serializable {
      */
     public void setField(int i, Field f) {
         // some code goes here
+
+        if (i < fields.length)
+            fields[i] = f;
     }
 
     /**
@@ -71,7 +83,11 @@ public class Tuple implements Serializable {
      */
     public Field getField(int i) {
         // some code goes here
-        return null;
+
+        if (i >= fields.length)
+            return null;
+
+        return fields[i];
     }
 
     /**
@@ -94,7 +110,8 @@ public class Tuple implements Serializable {
     public Iterator<Field> fields()
     {
         // some code goes here
-        return null;
+
+        return Arrays.stream(fields).iterator();
     }
 
     /**
@@ -103,5 +120,13 @@ public class Tuple implements Serializable {
     public void resetTupleDesc(TupleDesc td)
     {
         // some code goes here
+
+        fields = new Field[td.numFields()];
+        this.td = td;
     }
+
+    private TupleDesc td;
+    private RecordId rid;
+    private Field[] fields; // fixed-size Array rather than variable-length List
+
 }
