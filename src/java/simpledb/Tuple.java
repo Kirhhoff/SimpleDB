@@ -100,7 +100,13 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        throw new UnsupportedOperationException("Implement this");
+
+        StringBuilder ret = new StringBuilder(fields[0].toString());
+
+        for (int i = 1; i < fields.length; i++)
+            ret.append(" ").append(fields[i].toString());
+
+        return ret.toString();
     }
 
     /**
