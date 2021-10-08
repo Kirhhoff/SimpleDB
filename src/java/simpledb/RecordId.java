@@ -21,6 +21,10 @@ public class RecordId implements Serializable {
      */
     public RecordId(PageId pid, int tupleno) {
         // some code goes here
+
+        this.pageId = pid;
+        this.tupleno = tupleno;
+        this.hash = (String.valueOf(pid.hashCode()) + tupleno).hashCode();
     }
 
     /**
@@ -28,7 +32,8 @@ public class RecordId implements Serializable {
      */
     public int getTupleNumber() {
         // some code goes here
-        return 0;
+
+        return tupleno;
     }
 
     /**
@@ -36,7 +41,8 @@ public class RecordId implements Serializable {
      */
     public PageId getPageId() {
         // some code goes here
-        return null;
+
+        return pageId;
     }
 
     /**
@@ -48,7 +54,16 @@ public class RecordId implements Serializable {
     @Override
     public boolean equals(Object o) {
         // some code goes here
-        throw new UnsupportedOperationException("implement this");
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof RecordId))
+            return false;
+
+        RecordId that = (RecordId)o;
+
+        return pageId.equals(that.pageId) && tupleno == that.tupleno;
     }
 
     /**
@@ -60,8 +75,11 @@ public class RecordId implements Serializable {
     @Override
     public int hashCode() {
         // some code goes here
-        throw new UnsupportedOperationException("implement this");
 
+        return hash;
     }
 
+    private final PageId pageId;
+    private final int tupleno;
+    private final int hash;
 }

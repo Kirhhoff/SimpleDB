@@ -48,6 +48,8 @@ public class HeapPage implements Page {
         header = new byte[getHeaderSize()];
         for (int i=0; i<header.length; i++)
             header[i] = dis.readByte();
+
+        freeSlots = calculateFreeSlots();
         
         tuples = new Tuple[numSlots];
         try{
@@ -67,19 +69,21 @@ public class HeapPage implements Page {
     */
     private int getNumTuples() {        
         // some code goes here
-        return 0;
 
+        int pageSize = BufferPool.getPageSize();
+        int tupleSize = td.getSize();
+
+        return (pageSize * 8) / (tupleSize * 8 + 1);
     }
 
     /**
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
-    private int getHeaderSize() {        
-        
+    private int getHeaderSize() {
         // some code goes here
-        return 0;
-                 
+
+        return (numSlots + 7) / 8;
     }
     
     /** Return a view of this page before it was modified
@@ -111,8 +115,9 @@ public class HeapPage implements Page {
      * @return the PageId associated with this page.
      */
     public HeapPageId getId() {
-    // some code goes here
-    throw new UnsupportedOperationException("implement this");
+        // some code goes here
+
+        return pid;
     }
 
     /**
@@ -282,7 +287,8 @@ public class HeapPage implements Page {
      */
     public int getNumEmptySlots() {
         // some code goes here
-        return 0;
+
+        return freeSlots;
     }
 
     /**
@@ -290,7 +296,11 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        return false;
+
+        int headerPos = i / 8;
+        int bitmask = 1 << (i % 8);
+
+        return (header[headerPos] & bitmask) != 0;
     }
 
     /**
@@ -307,8 +317,103 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+
+        Tuple[] nonNullTuples = collectNonNullTuples();
+
+        return Arrays.stream(nonNullTuples).iterator();
     }
 
+    private int freeSlots;
+
+    private int calculateFreeSlots() {
+
+        byte b;
+        int use = 0, cnt;
+        for (int bIdx= 0; bIdx < numSlots / 8; bIdx++) {
+            b = header[bIdx];
+            cnt = 8;
+            while (cnt-- > 0) {
+                if ((b & 1) != 0)
+                    use++;
+                b >>= 1;
+            }
+        }
+
+        // deal with last byte
+        b = header[header.length - 1];
+        cnt = numSlots % 8;
+        while (cnt-- > 0) {
+            if ((b & 1) != 0)
+                use++;
+            b >>= 1;
+        }
+
+        return numSlots - use;
+    }
+
+    private Tuple[] collectNonNullTuples() {
+        int total = numSlots - getNumEmptySlots();
+        Tuple[] ret = new Tuple[total];
+
+        int headerPos = 0, retCnt = 0, tuplePos = 0;
+        byte b, bitCnt;
+        while (retCnt < total) {
+            b = header[headerPos++];
+            bitCnt = 8;
+            while (bitCnt-- > 0 && retCnt < total) {
+                if ((b & 1) != 0) {
+                    ret[retCnt++] = tuples[tuplePos++];
+                } else {
+                    tuplePos++;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    private Iterator<Tuple> lazyIterator() {
+        return new Iterator<Tuple>() {
+            private int accessCnt = 0;
+            private final int total = numSlots - getNumEmptySlots();
+
+            @Override
+            public boolean hasNext() {
+                return accessCnt < total;
+            }
+
+            private int bitCnt = 8;
+            private int bitIdx = 0;
+            private byte b = header[0];
+            private int pos = 0;
+            private int call_cnt = 0;
+            @Override
+            public Tuple next() {
+                if (!hasNext())
+                    throw new NoSuchElementException();
+
+                int bit;
+                while (true) {
+                    if (bitCnt == 0) {
+                        b = header[++bitIdx];
+                        while (b == 0) {
+                            b = header[++bitIdx];
+                            pos += 8;
+                        }
+                        bitCnt = 8;
+                    }
+                    while (bitCnt-- > 0) {
+                        bit = b & 1;
+                        b >>= 1;
+                        if (bit != 0) {
+                            accessCnt++;
+                            return tuples[pos++];
+                        }
+                        pos++;
+                    }
+                }
+            }
+        };
+    }
 }
 
