@@ -26,6 +26,10 @@ public class JoinPredicate implements Serializable {
      */
     public JoinPredicate(int field1, Predicate.Op op, int field2) {
         // some code goes here
+
+        this.op = op;
+        this.leftFieldIdx = field1;
+        this.rightFieldIdx = field2;
     }
 
     /**
@@ -36,24 +40,32 @@ public class JoinPredicate implements Serializable {
      */
     public boolean filter(Tuple t1, Tuple t2) {
         // some code goes here
-        return false;
+
+        return t1.getField(leftFieldIdx).compare(op, t2.getField(rightFieldIdx));
     }
     
     public int getField1()
     {
         // some code goes here
-        return -1;
+
+        return leftFieldIdx;
     }
     
     public int getField2()
     {
         // some code goes here
-        return -1;
+
+        return rightFieldIdx;
     }
     
     public Predicate.Op getOperator()
     {
         // some code goes here
-        return null;
+
+        return op;
     }
+
+    private final Predicate.Op op;
+    private final int leftFieldIdx;
+    private final int rightFieldIdx;
 }

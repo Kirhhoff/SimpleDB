@@ -22,11 +22,16 @@ public class Join extends Operator {
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
         // some code goes here
+
+        this.predicate = p;
+
+        resetChildren(child1, child2);
     }
 
     public JoinPredicate getJoinPredicate() {
         // some code goes here
-        return null;
+
+        return predicate;
     }
 
     /**
@@ -36,7 +41,8 @@ public class Join extends Operator {
      * */
     public String getJoinField1Name() {
         // some code goes here
-        return null;
+
+        return leftFiledName;
     }
 
     /**
@@ -46,7 +52,8 @@ public class Join extends Operator {
      * */
     public String getJoinField2Name() {
         // some code goes here
-        return null;
+
+        return rightFieldName;
     }
 
     /**
@@ -55,20 +62,32 @@ public class Join extends Operator {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+
+        return mergedTd;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
         // some code goes here
+
+        leftChild.open();
+        rightChild.open();
+        super.open();
     }
 
     public void close() {
         // some code goes here
+
+        super.close();
+        leftChild.close();
+        rightChild.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+
+        leftChild.rewind();
+        rightChild.rewind();
     }
 
     /**
@@ -91,18 +110,46 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+
+        if (leftChild.hasNext()) {
+
+        }
+
         return null;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+
+        return new OpIterator[]{leftChild, rightChild};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+
+        if (children.length < 2)
+            return;
+
+        resetChildren(children[0], children[1]);
     }
 
+    private final JoinPredicate predicate;
+    private OpIterator leftChild, rightChild;
+    private String leftFiledName, rightFieldName;
+    private TupleDesc mergedTd;
+
+    private void resetChildren(OpIterator left, OpIterator right) {
+
+        this.leftChild = left;
+        this.rightChild = right;
+
+        TupleDesc leftTd = left.getTupleDesc();
+        TupleDesc rightTd = rightChild.getTupleDesc();
+
+        this.leftFiledName = leftTd.getFieldName(predicate.getField1());
+        this.rightFieldName = rightTd.getFieldName(predicate.getField2());
+        this.mergedTd = TupleDesc.merge(leftTd, rightTd);
+    }
 }

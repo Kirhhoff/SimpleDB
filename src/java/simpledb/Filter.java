@@ -20,29 +20,43 @@ public class Filter extends Operator {
      */
     public Filter(Predicate p, OpIterator child) {
         // some code goes here
+
+        this.predicate = p;
+        this.child = child;
+        this.td = child.getTupleDesc();
     }
 
     public Predicate getPredicate() {
         // some code goes here
-        return null;
+
+        return predicate;
     }
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+
+        return td;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
         // some code goes here
+
+        child.open();
+        super.open();
     }
 
     public void close() {
         // some code goes here
+
+        super.close();
+        child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+
+        child.rewind();
     }
 
     /**
@@ -54,21 +68,45 @@ public class Filter extends Operator {
      *         more tuples
      * @see Predicate#filter
      */
-    protected Tuple fetchNext() throws NoSuchElementException,
+    protected Tuple fetchNext() throws
             TransactionAbortedException, DbException {
         // some code goes here
+
+        Tuple next;
+        while (child.hasNext()) {
+            next = child.next();
+            if (predicate.filter(next))
+                return next;
+        }
+
         return null;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+
+        return new OpIterator[]{child};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+
+        if (children.length >= 1)
+            resetChild(children[0]);
     }
 
+    private final Predicate predicate;
+    private OpIterator child;
+    private TupleDesc td;
+
+    private void resetChild(OpIterator child) {
+
+        if (this.child == child)
+            return;
+
+        this.child = child;
+        this.td = child.getTupleDesc();
+    }
 }
