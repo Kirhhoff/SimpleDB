@@ -50,6 +50,7 @@ public class HeapPage implements Page {
             header[i] = dis.readByte();
 
         freeSlots = calculateFreeSlots();
+        lastModifierTid = null;
         
         tuples = new Tuple[numSlots];
         try{
@@ -250,6 +251,18 @@ public class HeapPage implements Page {
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+
+        int tupleNo = t.getRecordId().getTupleNumber();
+        int tuplePageNo = tupleNo / numSlots;
+        int tupleSlotNo = tupleNo % numSlots;
+        if (tuplePageNo != pid.getPageNumber() || !isSlotUsed(tupleSlotNo))
+            throw new DbException("tuple not on page or tuple slot is already empty");
+
+        tuples[tupleSlotNo] = null;
+        t.setRecordId(null);
+
+        markSlotUsed(tupleSlotNo, false);
+        freeSlots++;
     }
 
     /**
@@ -262,6 +275,19 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+
+        if (!t.getTupleDesc().equals(td))
+            throw new DbException("tuple descriptor is mismatch");
+
+        int tupleSlotNo = nextFreeSlotNo();
+        if (tupleSlotNo < 0)
+            throw new DbException("page is full");
+
+        freeSlots--;
+        markSlotUsed(tupleSlotNo, true);
+
+        t.setRecordId(new RecordId(pid, numSlots * pid.getPageNumber() + tupleSlotNo));
+        tuples[tupleSlotNo] = t;
     }
 
     /**
@@ -270,7 +296,9 @@ public class HeapPage implements Page {
      */
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
-	// not necessary for lab1
+	    // not necessary for lab1
+
+        lastModifierTid = dirty ? tid : null;
     }
 
     /**
@@ -278,8 +306,10 @@ public class HeapPage implements Page {
      */
     public TransactionId isDirty() {
         // some code goes here
-	// Not necessary for lab1
-        return null;      
+	    // Not necessary for lab1
+
+        // when the page gets clean, tid will then be set to null
+        return lastModifierTid;
     }
 
     /**
@@ -309,6 +339,14 @@ public class HeapPage implements Page {
     private void markSlotUsed(int i, boolean value) {
         // some code goes here
         // not necessary for lab1
+
+        int headerPos = i / 8;
+        int bitmask = 1 << (i % 8);
+
+        if (value)
+            header[headerPos] |= bitmask;
+        else
+            header[headerPos] &= ~bitmask;
     }
 
     /**
@@ -324,6 +362,7 @@ public class HeapPage implements Page {
     }
 
     private int freeSlots;
+    private TransactionId lastModifierTid;
 
     private int calculateFreeSlots() {
 
@@ -370,6 +409,23 @@ public class HeapPage implements Page {
         }
 
         return ret;
+    }
+
+    private int nextFreeSlotNo() {
+        if (freeSlots == 0)
+            return -1;
+
+        int tupleSlotNo = 0, headerPos = -1;
+        while (~header[++headerPos] != 0)
+            tupleSlotNo += 8;
+
+        byte b = header[headerPos];
+        while ((b & 1) != 0) {
+            b >>= 1;
+            tupleSlotNo++;
+        }
+
+        return tupleSlotNo;
     }
 
     private Iterator<Tuple> lazyIterator() {
