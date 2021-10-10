@@ -42,7 +42,7 @@ public class Join extends Operator {
     public String getJoinField1Name() {
         // some code goes here
 
-        return leftFiledName;
+        return outerFiledName;
     }
 
     /**
@@ -53,7 +53,7 @@ public class Join extends Operator {
     public String getJoinField2Name() {
         // some code goes here
 
-        return rightFieldName;
+        return innerFieldName;
     }
 
     /**
@@ -70,8 +70,17 @@ public class Join extends Operator {
             TransactionAbortedException {
         // some code goes here
 
-        leftChild.open();
-        rightChild.open();
+        outerChild.open();
+        innerChild.open();
+
+        // prepare outer tuple such that
+        // later we only iterate over inner tuple
+        // and update outer until it's necessary
+        if (!outerChild.hasNext())
+            throw new NoSuchElementException();
+
+        outerTuple = outerChild.next();
+
         super.open();
     }
 
@@ -79,15 +88,15 @@ public class Join extends Operator {
         // some code goes here
 
         super.close();
-        leftChild.close();
-        rightChild.close();
+        outerChild.close();
+        innerChild.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
 
-        leftChild.rewind();
-        rightChild.rewind();
+        outerChild.rewind();
+        innerChild.rewind();
     }
 
     /**
@@ -111,8 +120,24 @@ public class Join extends Operator {
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
 
-        if (leftChild.hasNext()) {
+        Tuple innerTuple;
+        while (true) {
+            // if inner loop reaches its end,
+            // outer steps forward and inner rewinds
+            if (!innerChild.hasNext()) {
+                if (!outerChild.hasNext())
+                    break;
 
+                outerTuple = outerChild.next();
+
+                innerChild.rewind();
+                if (!innerChild.hasNext())
+                    break;
+            }
+
+            innerTuple = innerChild.next();
+            if (predicate.filter(outerTuple, innerTuple))
+                return concatenate(innerTuple);
         }
 
         return null;
@@ -122,7 +147,7 @@ public class Join extends Operator {
     public OpIterator[] getChildren() {
         // some code goes here
 
-        return new OpIterator[]{leftChild, rightChild};
+        return new OpIterator[]{outerChild, innerChild};
     }
 
     @Override
@@ -136,20 +161,36 @@ public class Join extends Operator {
     }
 
     private final JoinPredicate predicate;
-    private OpIterator leftChild, rightChild;
-    private String leftFiledName, rightFieldName;
+    private OpIterator outerChild, innerChild;
+    private String outerFiledName, innerFieldName;
+    private int outerNumFields, innerNumFields;
     private TupleDesc mergedTd;
+    private Tuple outerTuple;
 
     private void resetChildren(OpIterator left, OpIterator right) {
 
-        this.leftChild = left;
-        this.rightChild = right;
+        this.outerChild = left;
+        this.innerChild = right;
 
-        TupleDesc leftTd = left.getTupleDesc();
-        TupleDesc rightTd = rightChild.getTupleDesc();
+        TupleDesc outerTd = left.getTupleDesc();
+        TupleDesc innerTd = innerChild.getTupleDesc();
 
-        this.leftFiledName = leftTd.getFieldName(predicate.getField1());
-        this.rightFieldName = rightTd.getFieldName(predicate.getField2());
-        this.mergedTd = TupleDesc.merge(leftTd, rightTd);
+        this.outerFiledName = outerTd.getFieldName(predicate.getField1());
+        this.innerFieldName = innerTd.getFieldName(predicate.getField2());
+        this.outerNumFields = outerTd.numFields();
+        this.innerNumFields = innerTd.numFields();
+        this.mergedTd = TupleDesc.merge(outerTd, innerTd);
+    }
+
+    private Tuple concatenate(Tuple innerTuple) {
+        Tuple ret = new Tuple(mergedTd);
+
+        for (int i = 0; i < outerNumFields; i++)
+            ret.setField(i, outerTuple.getField(i));
+
+        for (int i = 0; i < innerNumFields; i++)
+            ret.setField(outerNumFields + i, innerTuple.getField(i));
+
+        return ret;
     }
 }

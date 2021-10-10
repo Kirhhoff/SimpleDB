@@ -105,7 +105,7 @@ public class Predicate implements Serializable {
     public boolean filter(Tuple t) {
         // some code goes here
 
-        return operand.compare(op, t.getField(fieldIdx));
+        return t.getField(fieldIdx).compare(op, operand);
     }
 
     /**
