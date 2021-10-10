@@ -30,7 +30,18 @@ public class Aggregate extends Operator {
      *            The aggregation operator to use
      */
     public Aggregate(OpIterator child, int afield, int gfield, Aggregator.Op aop) {
-	// some code goes here
+	    // some code goes here
+
+        this.child = child;
+        this.aggregateFieldIdx = afield;
+        this.groupByFieldIdx = gfield;
+        this.aggregateOp = aop;
+
+        this.td = child.getTupleDesc();
+        this.aggregateFieldName = td.getFieldName(afield);
+        this.groupByFieldName = (gfield == -1) ? null : td.getFieldName(gfield);
+
+        rewindAggregator();
     }
 
     /**
@@ -39,8 +50,9 @@ public class Aggregate extends Operator {
      *         {@link simpledb.Aggregator#NO_GROUPING}
      * */
     public int groupField() {
-	// some code goes here
-	return -1;
+	    // some code goes here
+
+        return groupByFieldIdx;
     }
 
     /**
@@ -49,16 +61,18 @@ public class Aggregate extends Operator {
      *         null;
      * */
     public String groupFieldName() {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+	    return groupByFieldName;
     }
 
     /**
      * @return the aggregate field
      * */
     public int aggregateField() {
-	// some code goes here
-	return -1;
+	    // some code goes here
+
+	    return aggregateFieldIdx;
     }
 
     /**
@@ -66,16 +80,18 @@ public class Aggregate extends Operator {
      *         tuples
      * */
     public String aggregateFieldName() {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+        return aggregateFieldName;
     }
 
     /**
      * @return return the aggregate operator
      * */
     public Aggregator.Op aggregateOp() {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+	    return aggregateOp;
     }
 
     public static String nameOfAggregatorOp(Aggregator.Op aop) {
@@ -84,7 +100,11 @@ public class Aggregate extends Operator {
 
     public void open() throws NoSuchElementException, DbException,
 	    TransactionAbortedException {
-	// some code goes here
+	    // some code goes here
+
+        child.open();
+        setupItr();
+        super.open();
     }
 
     /**
@@ -95,12 +115,20 @@ public class Aggregate extends Operator {
      * aggregate. Should return null if there are no more tuples.
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+        if (itr.hasNext())
+            return itr.next();
+
+	    return null;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-	// some code goes here
+	    // some code goes here
+
+        child.rewind();
+        rewindAggregator();
+        setupItr();
     }
 
     /**
@@ -115,23 +143,71 @@ public class Aggregate extends Operator {
      * iterator.
      */
     public TupleDesc getTupleDesc() {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+	    return td;
     }
 
     public void close() {
-	// some code goes here
+	    // some code goes here
+
+        super.close();
+
+        itr.close();
+        itr = null;
+
+        child.close();
     }
 
     @Override
     public OpIterator[] getChildren() {
-	// some code goes here
-	return null;
+	    // some code goes here
+
+	    return new OpIterator[]{child};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-	// some code goes here
+	    // some code goes here
+
+        if (children.length >=1 && children[0] != null)
+            resetChild(children[0]);
     }
-    
+
+    private OpIterator child;
+    private final int aggregateFieldIdx;
+    private final int groupByFieldIdx;
+    private final Aggregator.Op aggregateOp;
+
+    private final TupleDesc td;
+    private final String groupByFieldName;
+    private final String aggregateFieldName;
+
+    private Aggregator aggregator;
+
+    private OpIterator itr;
+
+    private void resetChild(OpIterator child) {
+        this.child = child;
+    }
+
+    private void rewindAggregator() {
+        Type aggregateFieldType = td.getFieldType(aggregateFieldIdx);
+        Type groupByFieldType = (groupByFieldIdx == -1) ? null : td.getFieldType(groupByFieldIdx);
+
+        switch (aggregateFieldType) {
+            case INT_TYPE: this.aggregator = new IntegerAggregator(groupByFieldIdx, groupByFieldType, aggregateFieldIdx, aggregateOp);
+                break;
+            case STRING_TYPE: this.aggregator = new StringAggregator(groupByFieldIdx, groupByFieldType, aggregateFieldIdx, aggregateOp);
+                break;
+        }
+    }
+
+    private void setupItr() throws TransactionAbortedException, DbException {
+        while (child.hasNext())
+            aggregator.mergeTupleIntoGroup(child.next());
+
+        itr = aggregator.iterator();
+        itr.open();
+    }
 }

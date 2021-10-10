@@ -1,9 +1,12 @@
 package simpledb;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Knows how to compute some aggregate over a set of StringFields.
  */
-public class StringAggregator implements Aggregator {
+public class StringAggregator extends AbstractAggregator{
 
     private static final long serialVersionUID = 1L;
 
@@ -15,30 +18,29 @@ public class StringAggregator implements Aggregator {
      * @param what aggregation operator to use -- only supports COUNT
      * @throws IllegalArgumentException if what != COUNT
      */
-
     public StringAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+        super(gbfield, gbfieldtype, afield, what);
     }
 
-    /**
-     * Merge a new tuple into the aggregate, grouping as indicated in the constructor
-     * @param tup the Tuple containing an aggregate field and a group-by field
-     */
-    public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+    @Override
+    protected AggregateData dataInstance() {
+        return new StringAggregateData();
+    }
+}
+
+class StringAggregateData implements AggregateData {
+
+    private int cnt = 0;
+
+    @Override
+    public void accumulate(Aggregator.Op op, int value) {
+        assert(op.equals(Aggregator.Op.COUNT));
+        cnt++;
     }
 
-    /**
-     * Create a OpIterator over group aggregate results.
-     *
-     * @return a OpIterator whose tuples are the pair (groupVal,
-     *   aggregateVal) if using group, or a single (aggregateVal) if no
-     *   grouping. The aggregateVal is determined by the type of
-     *   aggregate specified in the constructor.
-     */
-    public OpIterator iterator() {
-        // some code goes here
-        throw new UnsupportedOperationException("please implement me for lab2");
+    @Override
+    public int getResult(Aggregator.Op op) {
+        assert(op.equals(Aggregator.Op.COUNT));
+        return cnt;
     }
-
 }

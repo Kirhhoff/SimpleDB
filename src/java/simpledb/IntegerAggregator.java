@@ -1,54 +1,76 @@
 package simpledb;
 
+import java.util.*;
+
 /**
  * Knows how to compute some aggregate over a set of IntFields.
  */
-public class IntegerAggregator implements Aggregator {
+public class IntegerAggregator extends AbstractAggregator {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Aggregate constructor
-     * 
-     * @param gbfield
-     *            the 0-based index of the group-by field in the tuple, or
-     *            NO_GROUPING if there is no grouping
-     * @param gbfieldtype
-     *            the type of the group by field (e.g., Type.INT_TYPE), or null
-     *            if there is no grouping
-     * @param afield
-     *            the 0-based index of the aggregate field in the tuple
-     * @param what
-     *            the aggregation operator
-     */
-
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+        super(gbfield, gbfieldtype, afield, what);
     }
 
-    /**
-     * Merge a new tuple into the aggregate, grouping as indicated in the
-     * constructor
-     * 
-     * @param tup
-     *            the Tuple containing an aggregate field and a group-by field
-     */
-    public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+    @Override
+    protected AggregateData dataInstance() {
+        return IntAggregateData.instance(aggregateOp);
+    }
+}
+
+class IntAggregateData implements AggregateData{
+
+    int value;
+    int cnt;
+
+    private IntAggregateData(int initValue) {
+        this.value = initValue;
     }
 
-    /**
-     * Create a OpIterator over group aggregate results.
-     * 
-     * @return a OpIterator whose tuples are the pair (groupVal, aggregateVal)
-     *         if using group, or a single (aggregateVal) if no grouping. The
-     *         aggregateVal is determined by the type of aggregate specified in
-     *         the constructor.
-     */
-    public OpIterator iterator() {
-        // some code goes here
-        throw new
-        UnsupportedOperationException("please implement me for lab2");
+    private IntAggregateData() {
+        this.value = 0;
+        this.cnt = 0;
     }
 
+    public static IntAggregateData instance(Aggregator.Op op) {
+        switch (op) {
+            case MAX: return new IntAggregateData(Integer.MIN_VALUE);
+            case MIN: return new IntAggregateData(Integer.MAX_VALUE);
+            default: return new IntAggregateData();
+        }
+    }
+
+    @Override
+    public void accumulate(Aggregator.Op op, int value) {
+        switch (op) {
+            case MAX:
+                if (value > this.value)
+                    this.value = value;
+                break;
+            case MIN:
+                if (value < this.value)
+                    this.value = value;
+                break;
+            case SUM :
+                this.value += value;
+                break;
+            case COUNT:
+                cnt++;
+                break;
+            case AVG:
+                this.value += value;
+                cnt++;
+                break;
+        }
+    }
+
+    @Override
+    public int getResult(Aggregator.Op op) {
+        switch (op) {
+            case AVG: return this.value / this.cnt;
+            case COUNT: return this.cnt;
+            default: return this.value;
+        }
+    }
 }
