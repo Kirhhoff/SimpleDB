@@ -28,6 +28,7 @@ public class HeapFile implements DbFile {
         this.file = f;
         this.td = td;
         this.tableId = f.getAbsolutePath().hashCode();
+        this.appendPageCache = new HashMap<>();
     }
 
     /**
@@ -71,6 +72,12 @@ public class HeapFile implements DbFile {
     public Page readPage(PageId pid) {
         // some code goes here
 
+        // get newly appended page from cache rather than I/O
+        // remove after getting it, cuz buffer pool is now
+        // responsible to flush it back
+        if (!appendPageCache.isEmpty() && appendPageCache.containsKey(pid))
+            return appendPageCache.remove(pid);
+
         try {
             byte[] fileContent = readRawPage(pid);
             return new HeapPage(toHeapPageId(pid), fileContent);
@@ -91,7 +98,8 @@ public class HeapFile implements DbFile {
     public int numPages() {
         // some code goes here
 
-        return (int)(file.length() / BufferPool.getPageSize());
+        int pageSize = BufferPool.getPageSize();
+        return  (int)((file.length() + pageSize - 1) / pageSize);
     }
 
     // see DbFile.java for javadocs
@@ -100,22 +108,15 @@ public class HeapFile implements DbFile {
         // some code goes here
         // not necessary for lab1
 
-        ArrayList<Page> ret = new ArrayList<>();
-
         BufferPool bufferPool = Database.getBufferPool();
         HeapPage page;
         for (int pageNo = 0; pageNo < numPages(); pageNo++) {
-            page = (HeapPage)bufferPool.getPage(tid, new HeapPageId(tableId, pageNo++), Permissions.READ_WRITE);
-            try {
-                page.insertTuple(t);
-                ret.add(page);
-                return ret;
-            } catch (DbException e) {
-                e.printStackTrace();
-            }
+            page = (HeapPage)bufferPool.getPage(tid, new HeapPageId(tableId, pageNo), Permissions.READ_WRITE);
+            if (page.getNumEmptySlots() != 0)
+                return rawInsertTupleToPage(t, page, tid);
         }
 
-        throw new DbException("Time to expand file");
+        return rawInsertTupleToPage(t, appendPage(), tid);
     }
 
     // see DbFile.java for javadocs
@@ -127,6 +128,7 @@ public class HeapFile implements DbFile {
         HeapPageId pid = (HeapPageId)t.getRecordId().getPageId();
         HeapPage page = (HeapPage)Database.getBufferPool().getPage(tid, pid, Permissions.READ_WRITE);
         page.deleteTuple(t);
+        page.markDirty(true, tid);
 
         ArrayList<Page> ret = new ArrayList<>();
         ret.add(page);
@@ -144,14 +146,20 @@ public class HeapFile implements DbFile {
     private final File file;
     private final TupleDesc td;
     private final int tableId;
-    private InputStream fin = null;
+    private RandomAccessFile fin;
+
+    private final Map<PageId, Page> appendPageCache;
 
     private byte[] readRawPage(PageId pid) throws IOException {
         int pageSize = BufferPool.getPageSize();
         byte[] fileContent = new byte[pageSize];
 
         if (fin == null)
-            fin = new FileInputStream(file);
+            fin = new RandomAccessFile(file, "rw");
+
+        long seekPos = pid.getPageNumber() * (long)pageSize;
+        if (fin.getFilePointer() != seekPos)
+            fin.seek(seekPos);
 
         int readBytes = fin.read(fileContent, 0, pageSize);
         if (readBytes != pageSize)
@@ -168,5 +176,31 @@ public class HeapFile implements DbFile {
         return new HeapPageId(tableId, pid.getPageNumber());
     }
 
+    private ArrayList<Page> rawInsertTupleToPage(Tuple t, HeapPage page, TransactionId tid) throws DbException {
+        page.insertTuple(t);
+        page.markDirty(true, tid);
+
+        ArrayList<Page> ret = new ArrayList<>();
+        ret.add(page);
+
+        return ret;
+    }
+
+    private HeapPage appendPage() throws IOException {
+        // memory cache to avoid the unnecessary I/O
+        // for newly appended page
+        HeapPage page = rawAppendPage();
+        appendPageCache.put(page.getId(), page);
+        return page;
+    }
+
+    private HeapPage rawAppendPage() throws IOException {
+        BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(file, true));
+        byte[] emptyData = HeapPage.createEmptyPageData();
+        bw.write(emptyData);
+        bw.close();
+
+        return new HeapPage(new HeapPageId(tableId, numPages() - 1), HeapPage.createEmptyPageData());
+    }
 }
 

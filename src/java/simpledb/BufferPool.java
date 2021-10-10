@@ -144,6 +144,13 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+
+        List<Page> pagesInserted = Database.getCatalog().getDatabaseFile(tableId).insertTuple(tid, t);
+        for (Page page: pagesInserted) {
+            // skip pages already cached in buffer
+            if (searchPage(page.getId()) == null)
+                addPageToBuffer(page);
+        }
     }
 
     /**
@@ -163,6 +170,9 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+
+        int tableId = t.getRecordId().getPageId().getTableId();
+        Database.getCatalog().getDatabaseFile(tableId).deleteTuple(tid, t);
     }
 
     /**

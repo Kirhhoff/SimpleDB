@@ -252,14 +252,22 @@ public class HeapPage implements Page {
         // some code goes here
         // not necessary for lab1
 
+        if (t == null || t.getRecordId() == null)
+            throw new DbException("null tuple or null tuple recordId");
+
         int tupleNo = t.getRecordId().getTupleNumber();
-        int tuplePageNo = tupleNo / numSlots;
         int tupleSlotNo = tupleNo % numSlots;
-        if (tuplePageNo != pid.getPageNumber() || !isSlotUsed(tupleSlotNo))
-            throw new DbException("tuple not on page or tuple slot is already empty");
+
+        if (!isSlotUsed(tupleSlotNo) || !tuples[tupleSlotNo].getRecordId().equals(t.getRecordId())) {
+            if (!isSlotUsed(tupleNo))
+                throw new DbException("tuple slot is already empty");
+            else
+                throw new DbException("tuple not on page");
+        }
 
         tuples[tupleSlotNo] = null;
-        t.setRecordId(null);
+        int tableId = this.getId().getTableId();
+//        Database.getBufferPool().getPage(tid)
 
         markSlotUsed(tupleSlotNo, false);
         freeSlots++;
@@ -416,7 +424,7 @@ public class HeapPage implements Page {
             return -1;
 
         int tupleSlotNo = 0, headerPos = -1;
-        while (~header[++headerPos] != 0)
+        while (header[++headerPos] == -1)
             tupleSlotNo += 8;
 
         byte b = header[headerPos];
