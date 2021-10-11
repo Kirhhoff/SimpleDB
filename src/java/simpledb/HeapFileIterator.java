@@ -1,6 +1,7 @@
 package simpledb;
 
 import javax.xml.crypto.Data;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -71,19 +72,24 @@ public class HeapFileIterator implements DbFileIterator {
 
     private Iterator<Tuple> getNextPageIterator() throws TransactionAbortedException, DbException {
         if (curPage < file.numPages()) {
-            Page page = bufferPool.getPage(
-                    tid,
-                    new HeapPageId(tableId, curPage++),
-                    Permissions.READ_ONLY);
+            try {
+                Page page = bufferPool.getPage(
+                        tid,
+                        new HeapPageId(tableId, curPage++),
+                        Permissions.READ_ONLY);
 
-            if (page instanceof HeapPage)
-                return ((HeapPage) page).iterator();
+                if (page instanceof HeapPage)
+                    return ((HeapPage) page).iterator();
+
+            } catch (IOException e) {
+                return null;
+            }
         }
 
         return null;
     }
 
-    private Tuple fetchNext() throws TransactionAbortedException, DbException {
+    private Tuple fetchNext() throws TransactionAbortedException, DbException{
         if (itr == null)
             return null;
 

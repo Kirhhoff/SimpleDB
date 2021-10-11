@@ -172,7 +172,7 @@ public class HeapFile implements DbFile {
             fio.seek(seekPos);
 
         int readBytes = fio.read(fileContent, 0, pageSize);
-        if (readBytes != pageSize)
+        if (readBytes < 0)
             throw new IOException();
 
         return fileContent;
