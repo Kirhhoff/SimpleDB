@@ -1,12 +1,13 @@
 package simpledb;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
 
 /**
  * The delete operator. Delete reads tuples from its child operator and removes
  * them from the table they belong to.
  */
-public class Delete extends Operator {
+public class Delete extends UniqueOperator{
 
     private static final long serialVersionUID = 1L;
 
@@ -21,23 +22,8 @@ public class Delete extends Operator {
      */
     public Delete(TransactionId t, OpIterator child) {
         // some code goes here
-    }
 
-    public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
-    }
-
-    public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
-    }
-
-    public void close() {
-        // some code goes here
-    }
-
-    public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        super(t, child);
     }
 
     /**
@@ -49,20 +35,21 @@ public class Delete extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#deleteTuple
      */
-    protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
-    }
-
     @Override
-    public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
-    }
+    protected int performOperation() throws TransactionAbortedException, DbException {
+        int successfulDeletion = 0;
 
-    @Override
-    public void setChildren(OpIterator[] children) {
-        // some code goes here
+        BufferPool bufferPool = Database.getBufferPool();
+        while (child.hasNext()) {
+            try {
+                bufferPool.deleteTuple(tid, child.next());
+                successfulDeletion++;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return successfulDeletion;
     }
 
 }

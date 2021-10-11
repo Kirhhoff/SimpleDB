@@ -1,10 +1,13 @@
 package simpledb;
 
+import javax.xml.crypto.Data;
+import java.io.IOException;
+
 /**
  * Inserts tuples read from the child operator into the tableId specified in the
  * constructor
  */
-public class Insert extends Operator {
+public class Insert extends UniqueOperator {
 
     private static final long serialVersionUID = 1L;
 
@@ -24,23 +27,9 @@ public class Insert extends Operator {
     public Insert(TransactionId t, OpIterator child, int tableId)
             throws DbException {
         // some code goes here
-    }
 
-    public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
-    }
-
-    public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
-    }
-
-    public void close() {
-        // some code goes here
-    }
-
-    public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        super(t, child);
+        this.tableId = tableId;
     }
 
     /**
@@ -56,19 +45,19 @@ public class Insert extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#insertTuple
      */
-    protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+    @Override
+    protected int performOperation() throws TransactionAbortedException, DbException {
+        int successfulInsertion = 0;
+
+        BufferPool bufferPool = Database.getBufferPool();
+        while (child.hasNext()) {
+            try {
+                bufferPool.insertTuple(tid, tableId, child.next());
+                successfulInsertion++;
+            } catch (IOException e) { }
+        }
+        return successfulInsertion;
     }
 
-    @Override
-    public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
-    }
-
-    @Override
-    public void setChildren(OpIterator[] children) {
-        // some code goes here
-    }
+    private final int tableId;
 }

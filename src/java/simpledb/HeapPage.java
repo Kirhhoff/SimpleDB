@@ -266,8 +266,6 @@ public class HeapPage implements Page {
         }
 
         tuples[tupleSlotNo] = null;
-        int tableId = this.getId().getTableId();
-//        Database.getBufferPool().getPage(tid)
 
         markSlotUsed(tupleSlotNo, false);
         freeSlots++;
@@ -364,6 +362,7 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // some code goes here
 
+        System.out.println("Heap page iterator element num: " + (numSlots - getNumEmptySlots()));
         Tuple[] nonNullTuples = collectNonNullTuples();
 
         return Arrays.stream(nonNullTuples).iterator();

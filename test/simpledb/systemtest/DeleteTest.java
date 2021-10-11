@@ -18,6 +18,7 @@ public class DeleteTest extends FilterBase {
 //        Query q = new Query(deleteOperator, tid);
 
 //        q.start();
+        System.out.println("\ntotal cnt: " + createdTuples.size());
         deleteOperator.open();
         boolean hasResult = false;
         int result = -1;
@@ -32,6 +33,7 @@ public class DeleteTest extends FilterBase {
 
         deleteOperator.close();
 
+        System.out.println("delete cnt: " + result);
         // As part of the same transaction, scan the table
         if (result == 0) {
             // Deleted zero tuples: all tuples still in table
@@ -40,7 +42,9 @@ public class DeleteTest extends FilterBase {
             assert result == createdTuples.size();
             expectedTuples = new ArrayList<ArrayList<Integer>>();
         }
+        System.out.println("Start match\n");
         SystemTestUtil.matchTuples(table, tid, expectedTuples);
+        System.out.println("End match\n");
         return result;
     }
 

@@ -9,29 +9,38 @@ public class HeapFileIterator implements DbFileIterator {
     public HeapFileIterator(TransactionId tid, HeapFile file) {
         this.tid = tid;
         this.tableId = file.getId();
-        this.numPages = file.numPages();
+        this.file = file;
+        this.opened = false;
     }
 
     @Override
     public void open() throws DbException, TransactionAbortedException {
         bufferPool = Database.getBufferPool();
         rewind();
+        opened = true;
     }
 
     @Override
     public boolean hasNext() throws DbException, TransactionAbortedException {
-        return itr != null && (itr.hasNext() || curPage < numPages);
+        if (next != null)
+            return true;
+
+        next = fetchNext();
+
+        return next != null;
     }
 
     @Override
     public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
-        if (!hasNext())
-            throw new NoSuchElementException();
+        if (hasNext()) {
+            Tuple ret = next;
 
-        if (!itr.hasNext())
-            itr = getNextPageIterator();
+            next = null;
 
-        return itr.next();
+            return ret;
+        }
+
+        throw new NoSuchElementException();
     }
 
     @Override
@@ -42,27 +51,47 @@ public class HeapFileIterator implements DbFileIterator {
 
     @Override
     public void close() {
+        opened = false;
         itr = null;
         bufferPool = null;
     }
 
     private BufferPool bufferPool;
     private Iterator<Tuple> itr;
+    private Tuple next;
+    private boolean opened;
 
-    private TransactionId tid;
-    private int tableId;
-    private final int numPages;
+    private final TransactionId tid;
+    private final int tableId;
     private int curPage;
+    private final HeapFile file;
 
     private Iterator<Tuple> getNextPageIterator() throws TransactionAbortedException, DbException {
-        Page page = bufferPool.getPage(
-                tid,
-                new HeapPageId(tableId, curPage++),
-                Permissions.READ_ONLY);
+        System.out.println("tableId: [" + tableId + "] get pgNo: [" + curPage + "] total pgcnt: " + file.numPages());
 
-        if (page instanceof HeapPage)
-            return ((HeapPage)page).iterator();
+        if (curPage < file.numPages()) {
+            Page page = bufferPool.getPage(
+                    tid,
+                    new HeapPageId(tableId, curPage++),
+                    Permissions.READ_ONLY);
 
-        throw new TransactionAbortedException();
+            if (page instanceof HeapPage)
+                return ((HeapPage) page).iterator();
+        }
+
+        return null;
+    }
+
+    private Tuple fetchNext() throws TransactionAbortedException, DbException {
+        if (itr == null)
+            return null;
+
+        while (!itr.hasNext()) {
+            itr = getNextPageIterator();
+            if (itr == null)
+                return null;
+        }
+
+        return itr.next();
     }
 }
