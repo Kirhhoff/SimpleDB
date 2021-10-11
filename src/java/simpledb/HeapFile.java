@@ -90,6 +90,14 @@ public class HeapFile implements DbFile {
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
+
+        long offset = page.getId().getPageNumber() * (long)BufferPool.getPageSize();
+        byte[] rawData = page.getPageData();
+
+        if (fio.getFilePointer() != offset)
+            fio.seek(offset);
+
+        fio.write(rawData);
     }
 
     /**
@@ -146,7 +154,7 @@ public class HeapFile implements DbFile {
     private final File file;
     private final TupleDesc td;
     private final int tableId;
-    private RandomAccessFile fin;
+    private RandomAccessFile fio;
 
     private final Map<PageId, Page> appendPageCache;
 
@@ -154,14 +162,14 @@ public class HeapFile implements DbFile {
         int pageSize = BufferPool.getPageSize();
         byte[] fileContent = new byte[pageSize];
 
-        if (fin == null)
-            fin = new RandomAccessFile(file, "rw");
+        if (fio == null)
+            fio = new RandomAccessFile(file, "rw");
 
         long seekPos = pid.getPageNumber() * (long)pageSize;
-        if (fin.getFilePointer() != seekPos)
-            fin.seek(seekPos);
+        if (fio.getFilePointer() != seekPos)
+            fio.seek(seekPos);
 
-        int readBytes = fin.read(fileContent, 0, pageSize);
+        int readBytes = fio.read(fileContent, 0, pageSize);
         if (readBytes != pageSize)
             throw new IOException();
 
