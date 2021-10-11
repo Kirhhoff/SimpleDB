@@ -32,6 +32,9 @@ public class HeapFileIterator implements DbFileIterator {
 
     @Override
     public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
+        if (!opened)
+            throw new NoSuchElementException();
+
         if (hasNext()) {
             Tuple ret = next;
 
@@ -67,8 +70,6 @@ public class HeapFileIterator implements DbFileIterator {
     private final HeapFile file;
 
     private Iterator<Tuple> getNextPageIterator() throws TransactionAbortedException, DbException {
-        System.out.println("tableId: [" + tableId + "] get pgNo: [" + curPage + "] total pgcnt: " + file.numPages());
-
         if (curPage < file.numPages()) {
             Page page = bufferPool.getPage(
                     tid,

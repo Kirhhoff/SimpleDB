@@ -362,7 +362,6 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // some code goes here
 
-        System.out.println("Heap page iterator element num: " + (numSlots - getNumEmptySlots()));
         Tuple[] nonNullTuples = collectNonNullTuples();
 
         return Arrays.stream(nonNullTuples).iterator();

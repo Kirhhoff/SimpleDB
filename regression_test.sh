@@ -23,3 +23,6 @@ ant runsystest -Dtest=AggregateTest
 ant runtest -Dtest=HeapPageWriteTest
 ant runtest -Dtest=HeapFileWriteTest
 ant runtest -Dtest=BufferPoolWriteTest
+ant runtest -Dtest=InsertTest
+ant runsystest -Dtest=InsertTest
+ant runsystest -Dtest=DeleteTest

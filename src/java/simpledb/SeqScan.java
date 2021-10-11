@@ -105,10 +105,7 @@ public class SeqScan implements OpIterator {
 
     public boolean hasNext() throws TransactionAbortedException, DbException {
         // some code goes here
-//        if (itr != null)
-//            System.out.println("SeqScan hasNext: itr null: " + true + " itr.hasNext(): " + itr.hasNext());
-//        else
-//            System.out.println("SeqScan hasNext: itr null: " + false);
+
         return itr != null && itr.hasNext();
     }
 
