@@ -2,9 +2,7 @@ package simpledb;
 
 import java.io.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -36,8 +34,9 @@ public class BufferPool {
     public BufferPool(int numPages) {
         // some code goes here
 
-        buffer = new ArrayList<>(numPages);
+        buffer = new HashMap<>(numPages);
         bufferCapacity = numPages;
+        evictionList = new LinkedList<>();
     }
     
     public static int getPageSize() {
@@ -70,13 +69,15 @@ public class BufferPool {
      * @param perm the requested permissions on the page
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
-        throws TransactionAbortedException, DbException {
+            throws TransactionAbortedException, DbException, IOException {
         // some code goes here
 
         Page page = searchPage(pid);
 
-        if (page != null)
+        if (page != null) {
+            access(page);
             return page;
+        }
 
         return readInPage(pid);
     }
@@ -149,7 +150,9 @@ public class BufferPool {
         for (Page page: pagesInserted) {
             // skip pages already cached in buffer
             if (searchPage(page.getId()) == null)
-                addPageToBuffer(page);
+                addPage(page);
+            else
+                access(page);
         }
     }
 
@@ -172,7 +175,9 @@ public class BufferPool {
         // not necessary for lab1
 
         int tableId = t.getRecordId().getPageId().getTableId();
-        Database.getCatalog().getDatabaseFile(tableId).deleteTuple(tid, t);
+        ArrayList<Page> pagesDeleted = Database.getCatalog().getDatabaseFile(tableId).deleteTuple(tid, t);
+        for (Page page: pagesDeleted)
+            access(page);
     }
 
     /**
@@ -184,6 +189,16 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
 
+        if (isEmpty())
+            return;
+
+        Iterator<Page> itr = buffer.values().iterator();
+        Page page;
+        while (itr.hasNext()) {
+            page = itr.next();
+            if (page.isDirty() != null)
+                flushPage(page.getId());
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -197,6 +212,11 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+
+        Page pageToDiscard = searchPage(pid);
+
+        removePageFromBuffer(pageToDiscard);
+        discardPageFromEvictionList(pageToDiscard);
     }
 
     /**
@@ -207,7 +227,15 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
 
-        
+        Page page = searchPage(pid);
+
+        if (page == null || page.isDirty() == null)
+            return;
+
+        // write then mark clean
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        file.writePage(page);
+        page.markDirty(false, null);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -221,35 +249,42 @@ public class BufferPool {
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
-    private synchronized  void evictPage() throws DbException {
+    private synchronized  void evictPage() throws DbException, IOException {
         // some code goes here
         // not necessary for lab1
+
+        if (isEmpty())
+            return;
+
+        Page pageToEvict = selectPageToEvict();
+        if (pageToEvict.isDirty() != null)
+            flushPage(pageToEvict.getId());
+
+        // buffer eviction
+        removePageFromBuffer(pageToEvict);
     }
 
-    private final List<Page> buffer;
+    private final Map<PageId, Page> buffer;
+    private final LinkedList<Page> evictionList;
     private final int bufferCapacity;
 
     private Page searchPage(PageId pid) {
-
-        for (Page page: buffer)
-            if (page.getId().equals(pid))
-                return page;
-
-        return null;
+        return buffer.get(pid);
     }
 
-    private Page readInPage(PageId pid) throws DbException {
+    private Page readInPage(PageId pid) throws DbException, IOException {
         if (bufferIsFull())
-            throw new DbException("Buffer pool has already been full");
+            evictPage();
 
         Page page = readPageFromFile(pid);
 
-        addPageToBuffer(page);
+        addPage(page);
 
         return page;
     }
 
     private boolean bufferIsFull() {
+        assert buffer.size() == evictionList.size();
         return buffer.size() >= bufferCapacity;
     }
 
@@ -281,7 +316,39 @@ public class BufferPool {
         return file;
     }
 
+    private void addPage(Page page) {
+        addPageToBuffer(page);
+        addPageToEvictionList(page);
+    }
+
     private void addPageToBuffer(Page page) {
-        buffer.add(page);
+        buffer.put(page.getId(), page);
+    }
+
+    private void addPageToEvictionList(Page page) {
+        evictionList.addFirst(page);
+    }
+
+    private void removePageFromBuffer(Page page) {
+        buffer.remove(page.getId());
+    }
+
+    private void discardPageFromEvictionList(Page page) {
+        evictionList.remove(page);
+    }
+
+    private Page selectPageToEvict() {
+        // MRU policy
+        return evictionList.removeFirst();
+    }
+
+    private void access(Page page) {
+        if (evictionList.remove(page))
+            evictionList.addFirst(page);
+    }
+
+    private boolean isEmpty() {
+        assert buffer.size() == evictionList.size();
+        return buffer.size() == 0;
     }
 }

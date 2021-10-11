@@ -22,13 +22,14 @@ public class HeapFile implements DbFile {
      *            the file that stores the on-disk backing store for this heap
      *            file.
      */
-    public HeapFile(File f, TupleDesc td) {
+    public HeapFile(File f, TupleDesc td) throws FileNotFoundException {
         // some code goes here
 
         this.file = f;
         this.td = td;
         this.tableId = f.getAbsolutePath().hashCode();
         this.appendPageCache = new HashMap<>();
+        this.fio = new RandomAccessFile(file, "rw");
     }
 
     /**
@@ -91,12 +92,16 @@ public class HeapFile implements DbFile {
         // some code goes here
         // not necessary for lab1
 
-        long offset = page.getId().getPageNumber() * (long)BufferPool.getPageSize();
-        byte[] rawData = page.getPageData();
+        PageId pid = page.getId();
+        int pageNo = pid.getPageNumber();
+        if (pid.getTableId() != tableId)
+            throw new IOException();
 
+        long offset = pageNo * (long)BufferPool.getPageSize();
         if (fio.getFilePointer() != offset)
             fio.seek(offset);
 
+        byte[] rawData = page.getPageData();
         fio.write(rawData);
     }
 
@@ -129,7 +134,7 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
-            TransactionAbortedException {
+            TransactionAbortedException, IOException {
         // some code goes here
         // not necessary for lab1
 
@@ -161,9 +166,6 @@ public class HeapFile implements DbFile {
     private byte[] readRawPage(PageId pid) throws IOException {
         int pageSize = BufferPool.getPageSize();
         byte[] fileContent = new byte[pageSize];
-
-        if (fio == null)
-            fio = new RandomAccessFile(file, "rw");
 
         long seekPos = pid.getPageNumber() * (long)pageSize;
         if (fio.getFilePointer() != seekPos)

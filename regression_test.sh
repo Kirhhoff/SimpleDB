@@ -26,3 +26,4 @@ ant runtest -Dtest=BufferPoolWriteTest
 ant runtest -Dtest=InsertTest
 ant runsystest -Dtest=InsertTest
 ant runsystest -Dtest=DeleteTest
+ant runsystest -Dtest=EvictionTest
